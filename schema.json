@@ -1,0 +1,43 @@
+{
+  "type": "component",
+  "metadata": {},
+  "schema": {
+    "name": "drop-the-s3",
+    "friendlyName": "drop-the-s3",
+    "description": "An amazing Budibase component!",
+    "icon": "Text",
+    "settings": [
+      {
+        "type": "text",
+        "key": "bucket",
+        "label": "Bucket"
+      },
+      {
+        "type": "event",
+        "key": "onFileDrop",
+        "label": "On File Drop",
+        "context": [
+          {
+            "label": "File",
+            "key": "file"
+          },
+          {
+            "label": "UUID",
+            "key": "uuid"
+          }
+        ]
+      },
+      {
+        "type": "dataSource/s3",
+        "label": "S3 datasource",
+        "key": "datasourceId",
+        "info": "This component can't be used with S3 datasources that use custom endpoints"
+      },
+      {
+        "type": "dataSource",
+        "label": "Datasource liek redis",
+        "key": "RedisdatasourceId"
+      }
+    ]
+  }
+}
