@@ -2,38 +2,68 @@
   import { getContext } from "svelte";
 
   export let bucket;
-  export let onFileDrop;
+  export let prefix;
+  export let onFilesDropped;
+  export let onUploadStarted;
+  export let onUploadSucceded;
+  export let onUploadFailed;
   export let datasourceId;
 
-  const handleFileDrop = (e, uuid) => {
-    if (onFileDrop) {
-      console.log("File drop started to process");
-      onFileDrop({ file: e, uuid: uuid });
-      console.log("File drop processed");
+  const { API, styleable, Provider } = getContext("sdk");
+  const component = getContext("component");
+
+  let filesInQueue = 0;
+  let filesUploaded = 0;
+  let hasHover = false;
+
+  $: dataContext = {
+    filesInQueue,
+    filesUploaded,
+    hasHover,
+  };
+
+  const invokeFilesDropped = (files) => {
+    console.log(`Uploading ${files.length} files`);
+    if (onFilesDropped) {
+      onFilesDropped({ files });
     }
   };
 
-  const { API, notificationStore, styleable, uploadStore } = getContext("sdk");
-  const component = getContext("component");
+  const invokeUploadStarted = (index, filename, uuid) => {
+    console.log(
+      `Upload started of ${index} file with name ${filename} and uuid ${uuid}`,
+    );
+    if (onUploadStarted) {
+      onUploadStarted({ filename, uuid, key });
+    }
+  };
 
-  // onMount(() => {
-  //   uploadStore.actions.registerFileUpload($component.id, uploadByAPI)
-  // })
+  const invokeUploadSucceded = (index, filename, uuid) => {
+    console.log(
+      `Completed of ${index} file with name ${filename} and uuid ${uuid}`,
+    );
+    if (onUploadSucceded) {
+      onUploadSucceded({ filename, uuid });
+    }
+  };
 
-  // onDestroy(() => {
-  //   uploadStore.actions.unregisterFileUpload($component.id)
-  // })
+  const invokeUploadFailed = (index, filename, uuid, error) => {
+    console.log(
+      `Failed of ${index} file with name ${filename} and uuid ${uuid}: ${error}`,
+    );
+    if (onUploadFailed) {
+      onUploadFailed({ filename, uuid, error });
+    }
+  };
 
   let drop_zone;
 
-  let status = "";
-
-  function handleDragEnter(e) {
-    status = "You are dragging over the " + e.target.getAttribute("id");
+  function handleDragEnter(_) {
+    hasHover = true;
   }
 
-  function handleDragLeave(e) {
-    status = "You left the " + e.target.getAttribute("id");
+  function handleDragLeave(_) {
+    hasHover = false;
   }
 
   function handleDragDrop(ev) {
@@ -60,60 +90,68 @@
     );
   }
 
-  async function processFiles(files) {
-    for (const file of files) {
-      console.log(`Processing file: ${file.name}`);
+  function processFiles(files) {
+    const uuids = files.map((file) => {
       const uuid = uuidv4();
+      return {
+        uuid: uuid,
+        file: file,
+        filename: file.name,
+        key: prefix ? `${prefix}${uuid}` : uuid,
+      };
+    });
+    invokeFilesDropped(
+      uuids.map(({ filename, uuid, key }) => ({ filename, uuid, key })),
+    );
+    uploadUuidedFiles(uuids);
+  }
 
-      // await uploadFile(file);
-      await uploadByAPI(file)
-      // await uploadByMinio(file);
-      handleFileDrop(file, uuid);
+  function uploadUuidedFiles(uuids) {
+    initUploadCounter(uuids.length);
+    uuids.reduce((p, { uuid, file, key }, index) => {
+      return p
+        .then(() => {
+          invokeUploadStarted(index, file.name, uuid);
+        })
+        .then(() => {
+          return uploadByAPI(index, key, file);
+        })
+        .then(() => {
+          increaseUploadCounter();
+          invokeUploadSucceded(index, file.name, uuid);
+        })
+        .catch((error) => {
+          invokeUploadFailed(index, file.name, uuid, error);
+        });
+    }, Promise.resolve());
+  }
+
+  function initUploadCounter(queueSize) {
+    filesInQueue += queueSize;
+  }
+
+  function increaseUploadCounter() {
+    filesUploaded++;
+    if (filesUploaded === filesInQueue) {
+      filesInQueue = 0;
+      filesUploaded = 0;
     }
   }
 
-  async function uploadByAPI(data) {
-    try {
-      const res = await API.externalUpload({
-        datasourceId: datasourceId,
-        bucket: bucket,
-        key: "test.txt",
-        data: data,
-      });
-      notificationStore.actions.success("File uploaded successfully");
-      return res;
-    } catch (error) {
-      notificationStore.actions.error(
-        `Error uploading file to ${datasourceId} for ${data.name}: ${error?.message || error}`,
-      );
-    }
-  }
-
-  async function uploadFile(file) {
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        console.log(`File ${file.name} uploaded successfully.`);
-      } else {
-        console.error(`Failed to upload file ${file.name}.`);
-      }
-    } catch (error) {
-      console.error(`Error uploading file ${file.name}:`, error);
-    }
+  async function uploadByAPI(index, key, file) {
+    console.log(
+      `Start upload of ${index} file with name ${file.name} and key ${key}`,
+    );
+    return await API.externalUpload({
+      datasourceId: datasourceId,
+      bucket: bucket,
+      key: key,
+      data: file,
+    });
   }
 </script>
 
-<div use:styleable={$component.styles}>
-  <h2 id="app_status">Drag status: {status}</h2>
-  <h1>Drop Zone</h1>
-
+<div use:styleable={$component.styles} class="drag-and-drop-zone">
   <div
     role="button"
     on:dragenter={handleDragEnter}
@@ -132,9 +170,9 @@
     id="drop_zone"
     tabindex="0"
   >
-    This is a custom component. The bucket setting is: {bucket} for {datasourceId}.<br
-    />
-    The component name is: {$component.name}.
+    <Provider data={dataContext}>
+      <slot />
+    </Provider>
     <input
       type="file"
       id="input_file"
@@ -146,16 +184,14 @@
 </div>
 
 <style>
-  #drop_zone {
-    border: 2px dashed #000;
-    padding: 20px;
-    margin: 20px;
+  .drag-and-drop-zone {
+    cursor: pointer;
     transition:
       background-color 0.3s,
       border-color 0.3s;
   }
 
-  #drop_zone:hover {
+  .drag-and-drop-zone:hover {
     background-color: #f0f8ff;
     border-color: #007bff;
   }

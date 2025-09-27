@@ -13,13 +13,29 @@
         "label": "Bucket"
       },
       {
+        "type": "text",
+        "key": "prefix",
+        "label": "Prefix"
+      },
+      {
         "type": "event",
-        "key": "onFileDrop",
-        "label": "On File Drop",
+        "key": "onFilesDropped",
+        "label": "On Files Dropped",
         "context": [
           {
-            "label": "File",
-            "key": "file"
+            "label": "Files",
+            "key": "files"
+          }
+        ]
+      },
+      {
+        "type": "event",
+        "key": "onUploadStarted",
+        "label": "On Upload Started",
+        "context": [
+          {
+            "label": "Filename",
+            "key": "filename"
           },
           {
             "label": "UUID",
@@ -28,15 +44,70 @@
         ]
       },
       {
+        "type": "event",
+        "key": "onUploadSucceded",
+        "label": "On Upload Succeded",
+        "context": [
+          {
+            "label": "Filename",
+            "key": "filename"
+          },
+          {
+            "label": "UUID",
+            "key": "uuid"
+          }
+        ]
+      },
+      {
+        "type": "event",
+        "key": "onUploadFailed",
+        "label": "On Upload Failed",
+        "context": [
+          {
+            "label": "Filename",
+            "key": "filename"
+          },
+          {
+            "label": "UUID",
+            "key": "uuid"
+          },
+          {
+            "label": "Error",
+            "key": "error"
+          }
+        ]
+      },
+      {
         "type": "dataSource/s3",
         "label": "S3 datasource",
         "key": "datasourceId",
         "info": "This component can't be used with S3 datasources that use custom endpoints"
-      },
+      }
+    ],
+    "hasChildren": true,
+    "context": [
       {
-        "type": "dataSource",
-        "label": "Datasource liek redis",
-        "key": "RedisdatasourceId"
+        "type": "static",
+        "values": [
+          {
+            "label": "Files in Queue",
+            "key": "filesInQueue",
+            "type": "number",
+            "defaultValue": 0
+          },
+            {
+            "label": "Files Uploaded",
+            "key": "filesUploaded",
+            "type": "number",
+            "defaultValue": 0
+            },
+            {
+            "label": "Has Hover",
+            "key": "hasHover",
+            "type": "boolean",
+            "defaultValue": false
+            }
+        ]
       }
     ]
   }
